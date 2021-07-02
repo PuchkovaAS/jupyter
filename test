@@ -1,0 +1,173 @@
+%matplotlib notebook
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Задание
+# ---------------------------------------------------------------------
+c_ount = 1500
+time_complite = 20
+task_value = 30
+time_pulse = 1
+enable = False
+task_error = 0  # погрешность
+
+# ---------------------------------------------------------------------
+task_value_prev = 0
+time_cycle = 0.1
+time_next_pulse = 0
+time_pulse_max = 10
+time_pulse_min = 0.1
+current_opening = 0
+current_time = 0.0
+next_pulse = 0.0
+out = 0
+current_pulse_q = 0
+current_value = 0
+current_pulse_done = 0
+out_open = False
+out_close = False
+time_out_off = 0
+error = False
+delta_time = 0
+time_pulse_real = 0.2
+in_open_sw = False
+in_close_sw = False
+delta_value_tackt = 0
+
+
+def time_PWM(task_value, time_pulse, task_time):
+    global out_close, out_open, time_next_pulse, time_out_off, current_value, current_time, time_out_off, task_value_prev, error, enable, delta_time, in_open_sw, in_close_sw, time_pulse_real,delta_value_tackt
+
+    if time_pulse > time_pulse_max or time_pulse < time_pulse_min:
+        error = True
+
+    if in_open_sw:
+        current_value = 0
+    if in_close_sw:
+        current_value = 100
+
+    if task_value_prev != task_value and task_value != current_value and not error:
+        time_pulse_real = time_pulse
+        while 1:
+            delta_time = task_time / (abs(task_value - current_value) * time_pulse_min / time_pulse_real)
+            if time_pulse_real >= (delta_time - time_pulse):
+                time_pulse_real = time_pulse_real + time_pulse_min
+            else:
+                break
+
+        current_time = 0
+        time_next_pulse = 0
+        delta_value_tackt = time_cycle / (time_pulse_max / 100)
+        enable = True
+
+    if enable and abs(task_value - current_value) > task_error:
+
+        if task_value - current_value > 0:
+            out = out_open
+            delta_value = time_pulse_real / time_pulse_min
+        else:
+            out = out_close
+            delta_value = -time_pulse_real / time_pulse_min
+
+        if out:
+            if task_value - current_value > 0:
+                current_value = current_value + delta_value_tackt
+            else:
+                current_value = current_value - delta_value_tackt
+
+        if out and current_time >= time_out_off or abs(task_value - current_value) > task_error:
+            out = False
+
+        if current_time >= time_next_pulse:
+            out = True
+            time_out_off = current_time + time_pulse_real
+            time_next_pulse = current_time + delta_time
+
+        if task_value - current_value > 0:
+            out_open = out
+            out_close = False
+        else:
+            out_close = out
+            out_open = False
+
+        # print(f"{out_open}\t{out_close}\t{int(current_value)}\t{round(current_time, 2)}\t{index}")
+        current_time = round(current_time + time_cycle, 1)
+
+
+
+    else:
+        enable = False
+        out = False
+        out_open = False
+        out_close = False
+
+    task_value_prev = task_value
+
+    return out_open, out_close, current_value, current_time
+
+
+# print(f"out_open\tout_close\tint(current_value)\tcurrent_time\tindex")
+time_PWM(task_value=0, time_pulse=1, task_time=10)
+data_out1 = []
+data_out2 = []
+data_value = []
+data_time = []
+for _ in range(c_ount):
+    out_open1, out_close1, current_value1, current_time1 = time_PWM(task_value=10, time_pulse=time_pulse, task_time=time_complite)
+    data_out1.append(out_open1)
+    data_out2.append(out_close1)
+    data_value.append(current_value1)
+    data_time.append(current_time1)
+
+    
+# for _ in range(c_ount):
+#     out_open1, out_close1, current_value1, current_time1 = time_PWM(task_value=12, time_pulse=time_pulse, task_time=time_complite)
+#     data_out1.append(out_open1)
+#     data_out2.append(out_close1)
+#     data_value.append(current_value1)
+#     data_time.append(current_time1)
+
+
+# for _ in range(c_ount):
+#     out_open1, out_close1, current_value1, current_time1 = time_PWM(task_value=24, time_pulse=time_pulse, task_time=time_complite)
+#     data_out1.append(out_open1)
+#     data_out2.append(out_close1)
+#     data_value.append(current_value1)
+#     data_time.append(current_time1)
+    
+    
+    
+new_data1 = np.array(data_out1, int)
+new_data2 = np.array(data_out2, int)
+new_data_time = np.arange(0.00, time_cycle * c_ount, time_cycle)#np.array(data_time, float)
+new_data_value = np.array(data_value, float)
+
+
+plt.rcParams['figure.dpi'] = 150 # default for me was 75
+fig, ax1 = plt.subplots()
+
+ax1.plot(new_data_time, new_data_value, 'b-')
+ax1.set_xlabel('time (s)')
+# Make the y-axis label, ticks and tick labels match the line color.
+ax1.set_ylabel('percent', color='b')
+ax1.tick_params('y', colors='b')
+ax1.grid(axis='both', alpha=.3, color = 'blue',    #  цвет линий
+        linewidth = 1,    #  толщина
+        linestyle = '--')    #  начертание
+ax2 = ax1.twinx()
+
+ax2.plot(new_data_time, new_data1, 'r-')
+ax2.set_ylabel('open', color='r')
+ax2.tick_params('y', colors='r')
+
+
+ax3 = ax1.twinx()
+
+ax3.plot(new_data_time, new_data2, 'g-')
+ax3.set_ylabel('close', color='g')
+ax3.tick_params('y', colors='g')
+
+fig.tight_layout()
+plt.show()
+
+
